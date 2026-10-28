@@ -5,6 +5,7 @@ import com.example.android_practice.catalog.data.remote.PokemonApi
 import com.example.android_practice.catalog.data.remote.dto.NamedResourceDto
 import com.example.android_practice.catalog.data.remote.dto.PokemonDetailsDto
 import com.example.android_practice.catalog.data.remote.dto.PokemonPageDto
+import com.example.android_practice.catalog.data.remote.dto.PokemonTypeResponseDto
 import com.example.android_practice.catalog.domain.model.CatalogError
 import com.example.android_practice.catalog.domain.model.CatalogException
 import kotlinx.coroutines.CancellationException
@@ -154,6 +155,7 @@ class PokemonRepositoryImplTest {
     }
 
     private class FakePokemonApi(private val ids: List<Int> = emptyList()) : PokemonApi {
+        override suspend fun getPokemonType(type: String): PokemonTypeResponseDto = error("Unexpected type request")
         var detailsHandler: suspend (Int) -> PokemonDetailsDto = { pokemonDto(it) }
         val detailsCalls = mutableListOf<Int>()
         var pageArguments: Pair<Int, Int>? = null

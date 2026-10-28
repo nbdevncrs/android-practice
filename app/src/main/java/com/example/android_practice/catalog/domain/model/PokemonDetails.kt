@@ -9,4 +9,5 @@ data class PokemonDetails(
     val weightHectograms: Int,
     val abilities: List<PokemonAbility>,
     val stats: PokemonStats,
+    val localImagePath: String? = null,
 )

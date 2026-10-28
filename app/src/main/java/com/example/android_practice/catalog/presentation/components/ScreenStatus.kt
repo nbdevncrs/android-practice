@@ -39,6 +39,7 @@ fun ErrorStatus(error: CatalogError, onRetry: () -> Unit) {
         CatalogError.NOT_FOUND -> R.string.error_not_found
         CatalogError.REMOTE -> R.string.error_remote
         CatalogError.INVALID_DATA -> R.string.error_invalid_data
+        CatalogError.STORAGE -> R.string.error_storage
     }
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),

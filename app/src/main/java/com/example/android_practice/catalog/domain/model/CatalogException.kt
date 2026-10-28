@@ -5,6 +5,7 @@ enum class CatalogError {
     NOT_FOUND,
     REMOTE,
     INVALID_DATA,
+    STORAGE,
 }
 
 class CatalogException(

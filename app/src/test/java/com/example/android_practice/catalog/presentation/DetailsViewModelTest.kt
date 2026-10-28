@@ -9,6 +9,7 @@ import com.example.android_practice.catalog.domain.model.CatalogError
 import com.example.android_practice.catalog.domain.model.CatalogException
 import com.example.android_practice.catalog.domain.model.PokemonDetails
 import com.example.android_practice.catalog.domain.usecase.GetPokemonDetails
+import com.example.android_practice.favorites.TestFavoritesRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
@@ -19,6 +20,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.io.IOException
@@ -104,5 +107,62 @@ class DetailsViewModelTest {
     private fun createViewModel(repository: TestPokemonRepository, id: Int = 1) = DetailsViewModel(
         GetPokemonDetails(repository),
         SavedStateHandle(mapOf(DetailsViewModel.POKEMON_ID_KEY to id)),
+        TestFavoritesRepository(),
     ).also { store.put("details", it) }
+
+    @Test
+    fun savedDetailsAndRefreshNeverRequestNetworkFromFavorites() = runTest {
+        val network = TestPokemonRepository()
+        val favorites = TestFavoritesRepository()
+        val pokemon = details(25).copy(localImagePath = "/saved/25.img")
+        favorites.save(pokemon)
+        val vm = DetailsViewModel(GetPokemonDetails(network), SavedStateHandle(mapOf(
+            DetailsViewModel.POKEMON_ID_KEY to 25, DetailsViewModel.SAVED_ONLY_KEY to true,
+        )), favorites).also { store.put("details", it) }
+        runCurrent()
+        vm.refresh()
+        runCurrent()
+
+        assertEquals(DetailsUiState.Content(pokemon), vm.uiState.value)
+        assertTrue(network.detailsRequests.isEmpty())
+        assertEquals(true, vm.favoriteState.value.isFavorite)
+    }
+
+    @Test
+    fun favoriteToggleSavesAndRemovesLoadedPokemon() = runTest {
+        val favorites = TestFavoritesRepository()
+        val vm = DetailsViewModel(GetPokemonDetails(TestPokemonRepository()),
+            SavedStateHandle(mapOf(DetailsViewModel.POKEMON_ID_KEY to 1)), favorites)
+            .also { store.put("details", it) }
+        runCurrent()
+        vm.toggleFavorite()
+        runCurrent()
+        assertEquals(details(1), favorites.getPokemonDetails(1))
+        assertEquals(true, vm.favoriteState.value.isFavorite)
+        vm.toggleFavorite()
+        runCurrent()
+        assertTrue(favorites.saved.value.isEmpty())
+        assertEquals(false, vm.favoriteState.value.isFavorite)
+    }
+
+    @Test
+    fun storageFailureKeepsContentAndAllowsFavoriteRetry() = runTest {
+        val favorites = TestFavoritesRepository()
+        val vm = DetailsViewModel(GetPokemonDetails(TestPokemonRepository()),
+            SavedStateHandle(mapOf(DetailsViewModel.POKEMON_ID_KEY to 1)), favorites)
+            .also { store.put("details", it) }
+        runCurrent()
+        favorites.writeError = IOException("Full disk")
+        vm.toggleFavorite()
+        runCurrent()
+        assertTrue(vm.uiState.value is DetailsUiState.Content)
+        assertTrue(vm.favoriteState.value.hasError)
+        assertEquals(false, vm.favoriteState.value.isFavorite)
+
+        favorites.writeError = null
+        vm.toggleFavorite()
+        runCurrent()
+        assertFalse(vm.favoriteState.value.hasError)
+        assertEquals(true, vm.favoriteState.value.isFavorite)
+    }
 }

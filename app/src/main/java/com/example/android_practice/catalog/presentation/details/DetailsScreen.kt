@@ -18,6 +18,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,15 +36,42 @@ import com.example.android_practice.catalog.presentation.components.displayName
 import java.util.Locale
 
 @Composable
-fun DetailsScreen(uiState: DetailsUiState, onBack: () -> Unit, onRefresh: () -> Unit, onRetry: () -> Unit) {
+fun DetailsScreen(
+    uiState: DetailsUiState,
+    favoriteState: FavoriteActionState,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+    onRetry: () -> Unit,
+    onToggleFavorite: () -> Unit,
+) {
     Column(Modifier.fillMaxSize()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(8.dp)) {
             IconButton(onClick = onBack) {
-                Icon(painterResource(R.drawable.ic_back), contentDescription = stringResource(R.string.back_to_catalog))
+                Icon(painterResource(R.drawable.ic_back), contentDescription = stringResource(R.string.back))
             }
             Text(stringResource(R.string.details_title), style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.weight(1f))
-            RefreshButton(enabled = uiState !is DetailsUiState.Loading, onClick = onRefresh)
+            IconButton(
+                onClick = onToggleFavorite,
+                enabled = uiState is DetailsUiState.Content && !favoriteState.isChanging &&
+                    (favoriteState.isFavorite != null || favoriteState.hasError),
+            ) {
+                Icon(
+                    painterResource(if (favoriteState.isFavorite == true) R.drawable.ic_favorite else R.drawable.ic_favorite_outline),
+                    contentDescription = stringResource(if (favoriteState.isFavorite == true)
+                        R.string.remove_favorite else R.string.add_favorite),
+                    tint = if (favoriteState.isFavorite == true) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            RefreshButton(enabled = uiState !is DetailsUiState.Loading && !favoriteState.isChanging, onClick = onRefresh)
+        }
+        if (favoriteState.isChanging) Text(stringResource(R.string.updating_favorite), modifier = Modifier.padding(horizontal = 20.dp))
+        if (favoriteState.hasError) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 20.dp)) {
+                Text(stringResource(R.string.favorite_action_error), color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+                TextButton(onClick = onToggleFavorite, enabled = !favoriteState.isChanging) { Text(stringResource(R.string.retry)) }
+            }
         }
         when (uiState) {
             DetailsUiState.Loading -> LoadingStatus(stringResource(R.string.loading_pokemon))
@@ -57,7 +85,7 @@ fun DetailsScreen(uiState: DetailsUiState, onBack: () -> Unit, onRefresh: () -> 
 private fun PokemonDetailsContent(pokemon: PokemonDetails) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-            PokemonArtwork(pokemon.name, pokemon.imageUrl, Modifier.size(120.dp))
+            PokemonArtwork(pokemon.name, pokemon.imageUrl, Modifier.size(120.dp), pokemon.localImagePath)
             Spacer(Modifier.height(16.dp))
             Text(stringResource(R.string.pokemon_number, pokemon.id), color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(pokemon.name.displayName(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
