@@ -2,15 +2,8 @@ package com.example.android_practice.navigation
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -19,12 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -47,6 +37,10 @@ import com.example.android_practice.catalog.presentation.filters.FiltersScreen
 import com.example.android_practice.catalog.presentation.filters.FiltersViewModel
 import com.example.android_practice.favorites.presentation.FavoritesScreen
 import com.example.android_practice.favorites.presentation.FavoritesViewModel
+import com.example.android_practice.profile.presentation.view.ProfileRoute
+import com.example.android_practice.profile.presentation.view.ProfileViewModel
+import com.example.android_practice.profile.presentation.edit.EditProfileRoute
+import com.example.android_practice.profile.presentation.edit.EditProfileViewModel
 
 private object Routes {
     const val CATALOG_GRAPH = "catalog_graph"
@@ -57,7 +51,9 @@ private object Routes {
     const val FAVORITES_GRAPH = "favorites_graph"
     const val FAVORITES = "favorites"
     const val FAVORITE_DETAILS = "favorite_details/{${DetailsViewModel.POKEMON_ID_KEY}}"
+    const val PROFILE_GRAPH = "profile_graph"
     const val PROFILE = "profile"
+    const val EDIT_PROFILE = "edit_profile"
     fun details(id: Int) = "details/$id"
     fun favoriteDetails(id: Int) = "favorite_details/$id"
 }
@@ -65,7 +61,7 @@ private object Routes {
 private enum class BottomTab(val route: String, @param:StringRes val title: Int, @param:DrawableRes val icon: Int) {
     CATALOG(Routes.CATALOG_GRAPH, R.string.catalog_title, R.drawable.ic_catalog),
     FAVORITES(Routes.FAVORITES_GRAPH, R.string.favorites_title, R.drawable.ic_favorite),
-    PROFILE(Routes.PROFILE, R.string.profile_title, R.drawable.ic_profile),
+    PROFILE(Routes.PROFILE_GRAPH, R.string.profile_title, R.drawable.ic_profile),
 }
 
 @Composable
@@ -83,9 +79,15 @@ fun AppNavigation(container: AppContainer) {
         DetailsViewModel.factory(container.getPokemonDetails, container.favoritesRepository)
     }
     val favoritesFactory = remember(container) { FavoritesViewModel.factory(container.favoritesRepository) }
+    val profileFactory = remember(container) { ProfileViewModel.factory(container.profileRepository, container.resumeRepository) }
+    val editProfileFactory = remember(container) {
+        EditProfileViewModel.factory(container.profileRepository, container.avatarRepository,
+            container.applicationScope, container.discardUnusedAvatar)
+    }
+    val isEditingProfile = destination?.route == Routes.EDIT_PROFILE
 
-    Scaffold(floatingActionButton = { NetworkDiagnosticsButton() }, bottomBar = {
-        if (destination?.route != Routes.FILTERS) {
+    Scaffold(floatingActionButton = { if (!isEditingProfile) NetworkDiagnosticsButton() }, bottomBar = {
+        if (destination?.route != Routes.FILTERS && !isEditingProfile) {
             NavigationBar {
                 BottomTab.entries.forEach { tab ->
                     val selected = destination?.hierarchy?.any { it.route == tab.route } == true
@@ -179,25 +181,18 @@ fun AppNavigation(container: AppContainer) {
                     DetailsRoute(entry, detailsFactory, onBack = { navController.popBackStack() })
                 }
             }
-            composable(Routes.PROFILE) {
-                PlaceholderScreen(BottomTab.PROFILE, R.string.profile_placeholder)
+            navigation(startDestination = Routes.PROFILE, route = Routes.PROFILE_GRAPH) {
+                composable(Routes.PROFILE) { entry ->
+                    ProfileRoute(entry, profileFactory,
+                        onEdit = { navController.navigate(Routes.EDIT_PROFILE) { launchSingleTop = true } })
+                }
+                composable(Routes.EDIT_PROFILE) { entry ->
+                    EditProfileRoute(entry, editProfileFactory, onBack = {
+                        if (navController.currentBackStackEntry == entry) navController.popBackStack()
+                    })
+                }
             }
         }
     }
 }
 
-@Composable
-private fun PlaceholderScreen(tab: BottomTab, @StringRes message: Int) {
-    Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(painterResource(tab.icon), contentDescription = null, modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.height(16.dp))
-        Text(stringResource(tab.title), style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(8.dp))
-        Text(stringResource(message), color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-    }
-}
