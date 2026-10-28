@@ -14,6 +14,13 @@ import com.example.android_practice.core.storage.applicationPreferences
 import com.example.android_practice.favorites.data.local.FileFavoriteArtworkStore
 import com.example.android_practice.favorites.data.repository.RoomFavoritesRepository
 import com.example.android_practice.favorites.domain.repository.FavoritesRepository
+import com.example.android_practice.profile.data.repository.DataStoreProfileRepository
+import com.example.android_practice.profile.domain.repository.ProfileRepository
+import com.example.android_practice.profile.domain.repository.AvatarRepository
+import com.example.android_practice.profile.data.repository.FileAvatarRepository
+import com.example.android_practice.profile.data.repository.HttpResumeRepository
+import com.example.android_practice.profile.domain.repository.ResumeRepository
+import com.example.android_practice.profile.domain.usecase.DiscardUnusedAvatar
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
@@ -22,13 +29,20 @@ import kotlinx.coroutines.SupervisorJob
 
 class AppContainer(context: Context) {
     private val applicationContext = context.applicationContext
-    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    internal val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val preferences by lazy { applicationPreferences(applicationContext) }
 
     val catalogFiltersRepository: CatalogFiltersRepository by lazy {
         DataStoreCatalogFiltersRepository(preferences)
     }
     val filterBadgeCache by lazy { FilterBadgeCache(catalogFiltersRepository, applicationScope) }
+
+    val profileRepository: ProfileRepository by lazy { DataStoreProfileRepository(preferences) }
+    val avatarRepository: AvatarRepository by lazy { FileAvatarRepository(applicationContext) }
+    val discardUnusedAvatar by lazy { DiscardUnusedAvatar(profileRepository, avatarRepository) }
+    val resumeRepository: ResumeRepository by lazy {
+        HttpResumeRepository(File(applicationContext.cacheDir, "profile/resumes"), client)
+    }
 
     private val database by lazy { PracticeDatabase.create(applicationContext) }
     val favoritesRepository: FavoritesRepository by lazy {
