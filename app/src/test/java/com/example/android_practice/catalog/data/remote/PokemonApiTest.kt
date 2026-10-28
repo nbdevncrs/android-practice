@@ -71,4 +71,18 @@ class PokemonApiTest {
         server.enqueue(MockResponse().setResponseCode(404))
         api.getPokemonDetails(0)
     }
+
+    @Test
+    fun typeRequestParsesPokemonReferences() = runBlocking {
+        server.enqueue(MockResponse().setBody("""
+            {"name":"electric","pokemon":[
+              {"slot":1,"pokemon":{"name":"pikachu","url":"https://pokeapi.co/api/v2/pokemon/25/"}}
+            ],"moves":[]}
+        """.trimIndent()))
+
+        val type = api.getPokemonType("electric")
+
+        assertEquals("/api/v2/type/electric/", server.takeRequest(5, TimeUnit.SECONDS)?.path)
+        assertEquals("pikachu", type.pokemon.single().pokemon.name)
+    }
 }

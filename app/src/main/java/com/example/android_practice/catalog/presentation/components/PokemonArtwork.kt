@@ -19,11 +19,13 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import java.io.File
 
 @Composable
-fun PokemonArtwork(name: String, imageUrl: String?, modifier: Modifier = Modifier) {
+fun PokemonArtwork(name: String, imageUrl: String?, modifier: Modifier = Modifier, localImagePath: String? = null) {
     val artworkUrl = imageUrl?.takeIf { it.isNotBlank() }
-    var showPlaceholder by remember(artworkUrl) { mutableStateOf(true) }
+    val imageModel = localImagePath?.let(::File) ?: artworkUrl
+    var showPlaceholder by remember(imageModel) { mutableStateOf(true) }
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -35,9 +37,9 @@ fun PokemonArtwork(name: String, imageUrl: String?, modifier: Modifier = Modifie
             Text(name.take(1).uppercase(), style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
         }
-        if (artworkUrl != null) {
+        if (imageModel != null) {
             AsyncImage(
-                model = artworkUrl,
+                model = imageModel,
                 contentDescription = null,
                 contentScale = ContentScale.Fit,
                 onLoading = { showPlaceholder = true },

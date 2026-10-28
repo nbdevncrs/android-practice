@@ -1,11 +1,14 @@
 package com.example.android_practice.catalog.data.repository
 
 import com.example.android_practice.catalog.data.cache.PokemonMemoryCache
+import com.example.android_practice.catalog.data.cache.PokemonSearchIndex
 import com.example.android_practice.catalog.data.mapper.InvalidPokemonDataException
 import com.example.android_practice.catalog.data.mapper.pokemonId
 import com.example.android_practice.catalog.data.mapper.toDomain
 import com.example.android_practice.catalog.data.mapper.toSummary
 import com.example.android_practice.catalog.data.remote.PokemonApi
+import com.example.android_practice.catalog.data.remote.dto.NamedResourceDto
+import com.example.android_practice.catalog.domain.model.CatalogFilters
 import com.example.android_practice.catalog.domain.model.CatalogError
 import com.example.android_practice.catalog.domain.model.CatalogException
 import com.example.android_practice.catalog.domain.model.PokemonDetails
@@ -35,21 +38,40 @@ class PokemonRepositoryImpl(
 
     private val requests = Semaphore(maxConcurrentRequests)
     private val cache = PokemonMemoryCache(cacheCapacity)
+    private val searchIndex = PokemonSearchIndex(api, requests)
 
-    override suspend fun getPokemonPage(limit: Int, offset: Int, refresh: Boolean): PokemonPage {
+    override suspend fun getPokemonPage(
+        limit: Int,
+        offset: Int,
+        refresh: Boolean,
+        filters: CatalogFilters,
+    ): PokemonPage {
         require(limit > 0)
         require(offset >= 0)
         return withContext(ioDispatcher) {
             translateErrors {
-                val page = requests.withPermit { api.getPokemonPage(limit, offset) }
-                val items = coroutineScope {
-                    page.results.map { resource ->
-                        async { getPokemonDetails(resource.pokemonId(), refresh).toSummary() }
-                    }.awaitAll()
+                val normalized = filters.normalized()
+                if (normalized.isActive) {
+                    val query = normalized.nameQuery.replace('-', ' ')
+                    val matches = searchIndex.get(normalized.type, refresh)
+                        .filter { it.name.replace('-', ' ').contains(query, ignoreCase = true) }
+                    PokemonPage(
+                        items = loadSummaries(matches.drop(offset).take(limit), refresh),
+                        totalCount = matches.size,
+                        hasNextPage = offset.toLong() + limit < matches.size,
+                    )
+                } else {
+                    val page = requests.withPermit { api.getPokemonPage(limit, offset) }
+                    PokemonPage(loadSummaries(page.results, refresh), page.count, hasNextPage = page.next != null)
                 }
-                PokemonPage(items, page.count, hasNextPage = page.next != null)
             }
         }
+    }
+
+    private suspend fun loadSummaries(resources: List<NamedResourceDto>, refresh: Boolean) = coroutineScope {
+        resources.map { resource ->
+            async { getPokemonDetails(resource.pokemonId(), refresh).toSummary() }
+        }.awaitAll()
     }
 
     override suspend fun getPokemonDetails(id: Int, refresh: Boolean): PokemonDetails {

@@ -1,6 +1,7 @@
 package com.example.android_practice.catalog.presentation
 
 import com.example.android_practice.catalog.domain.model.PokemonAbility
+import com.example.android_practice.catalog.domain.model.CatalogFilters
 import com.example.android_practice.catalog.domain.model.PokemonDetails
 import com.example.android_practice.catalog.domain.model.PokemonPage
 import com.example.android_practice.catalog.domain.model.PokemonStats
@@ -9,12 +10,14 @@ import com.example.android_practice.catalog.domain.repository.PokemonRepository
 
 internal class TestPokemonRepository : PokemonRepository {
     val pageRequests = mutableListOf<Triple<Int, Int, Boolean>>()
+    val pageFilters = mutableListOf<CatalogFilters>()
     val detailsRequests = mutableListOf<Pair<Int, Boolean>>()
     var pageHandler: suspend (Int, Int, Boolean) -> PokemonPage = { _, _, _ -> page() }
     var detailsHandler: suspend (Int, Boolean) -> PokemonDetails = { id, _ -> details(id) }
 
-    override suspend fun getPokemonPage(limit: Int, offset: Int, refresh: Boolean): PokemonPage {
+    override suspend fun getPokemonPage(limit: Int, offset: Int, refresh: Boolean, filters: CatalogFilters): PokemonPage {
         pageRequests += Triple(limit, offset, refresh)
+        pageFilters += filters
         return pageHandler(limit, offset, refresh)
     }
 

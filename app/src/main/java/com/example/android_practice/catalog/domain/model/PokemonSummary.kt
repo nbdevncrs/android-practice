@@ -5,4 +5,5 @@ data class PokemonSummary(
     val name: String,
     val types: List<String>,
     val imageUrl: String?,
+    val localImagePath: String? = null,
 )

@@ -5,6 +5,7 @@ import com.example.android_practice.catalog.presentation.list.CatalogUiState
 
 import androidx.lifecycle.ViewModelStore
 import com.example.android_practice.catalog.domain.model.CatalogError
+import com.example.android_practice.catalog.domain.model.CatalogFilters
 import com.example.android_practice.catalog.domain.model.CatalogException
 import com.example.android_practice.catalog.domain.model.PokemonPage
 import com.example.android_practice.catalog.domain.usecase.GetPokemonPage
@@ -121,5 +122,53 @@ class CatalogViewModelTest {
     }
 
     private fun createViewModel(repository: TestPokemonRepository) =
-        CatalogViewModel(GetPokemonPage(repository)).also { store.put("catalog", it) }
+        CatalogViewModel(GetPokemonPage(repository), TestCatalogFiltersRepository()).also { store.put("catalog", it) }
+
+    @Test
+    fun refreshAndRetryKeepAppliedFilters() = runTest {
+        val repository = TestPokemonRepository()
+        val vm = createViewModel(repository)
+        vm.loadPage(filters = CatalogFilters(" PIKA ", " ELECTRIC "))
+        runCurrent()
+        vm.refresh()
+        runCurrent()
+        vm.retry()
+        runCurrent()
+
+        assertEquals(List(3) { CatalogFilters("pika", "electric") }, repository.pageFilters)
+        assertEquals(listOf(false, true, true), repository.pageRequests.map { it.third })
+    }
+
+    @Test
+    fun initialRequestUsesSavedFiltersAndReloadReadsTheirNewValues() = runTest {
+        val repository = TestPokemonRepository()
+        val settings = TestCatalogFiltersRepository(CatalogFilters(type = "water"))
+        val vm = CatalogViewModel(GetPokemonPage(repository), settings).also { store.put("catalog", it) }
+        assertTrue(repository.pageRequests.isEmpty())
+        runCurrent()
+        assertEquals(listOf(CatalogFilters(type = "water")), repository.pageFilters)
+
+        settings.save(CatalogFilters("pika", "electric"))
+        vm.reloadFilters()
+        runCurrent()
+        assertEquals(listOf(CatalogFilters(type = "water"), CatalogFilters("pika", "electric")), repository.pageFilters)
+    }
+
+    @Test
+    fun settingsReadFailureDoesNotLoadDefaultCatalogAndRetryRestoresSavedFilters() = runTest {
+        val repository = TestPokemonRepository()
+        val settings = TestCatalogFiltersRepository(CatalogFilters(type = "fire")).apply {
+            readError = IOException("Storage unavailable")
+        }
+        val vm = CatalogViewModel(GetPokemonPage(repository), settings).also { store.put("catalog", it) }
+        runCurrent()
+        assertEquals(CatalogUiState.Error(CatalogError.STORAGE), vm.uiState.value)
+        assertTrue(repository.pageRequests.isEmpty())
+
+        settings.readError = null
+        vm.retry()
+        runCurrent()
+        assertEquals(listOf(CatalogFilters(type = "fire")), repository.pageFilters)
+        assertTrue(vm.uiState.value is CatalogUiState.Content)
+    }
 }
