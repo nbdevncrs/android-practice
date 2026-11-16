@@ -81,8 +81,13 @@ fun AppNavigation(container: AppContainer) {
     val favoritesFactory = remember(container) { FavoritesViewModel.factory(container.favoritesRepository) }
     val profileFactory = remember(container) { ProfileViewModel.factory(container.profileRepository, container.resumeRepository) }
     val editProfileFactory = remember(container) {
-        EditProfileViewModel.factory(container.profileRepository, container.avatarRepository,
-            container.applicationScope, container.discardUnusedAvatar)
+        EditProfileViewModel.factory(
+            repository = container.profileRepository,
+            avatars = container.avatarRepository,
+            cleanupScope = container.applicationScope,
+            discardUnusedAvatar = container.discardUnusedAvatar,
+            saveProfileAndScheduleReminder = container.saveProfileAndScheduleReminder,
+        )
     }
     val isEditingProfile = destination?.route == Routes.EDIT_PROFILE
 

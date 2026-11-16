@@ -7,6 +7,8 @@ import androidx.datastore.preferences.core.emptyPreferences
 import com.example.android_practice.catalog.data.repository.DataStoreCatalogFiltersRepository
 import com.example.android_practice.catalog.domain.model.CatalogFilters
 import com.example.android_practice.profile.domain.model.UserProfile
+import com.example.android_practice.reminders.data.repository.DataStoreReminderRepository
+import com.example.android_practice.reminders.domain.model.ClassReminder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -48,10 +50,11 @@ class DataStoreProfileRepositoryTest {
             scope = CoroutineScope(firstJob + StandardTestDispatcher(testScheduler)),
             produceFile = { file },
         )
-        val expected = UserProfile("Alex Morgan", "content://example/Photos/Avatar", "https://example.com/MyResume.pdf")
+        val expected = UserProfile("Alex Morgan", "content://example/Photos/Avatar", "https://example.com/MyResume.pdf", "09:05")
         try {
             DataStoreProfileRepository(firstStore).save(UserProfile(
                 " Alex Morgan ", " content://example/Photos/Avatar ", " https://example.com/MyResume.pdf ",
+                "09:05",
             ))
         } finally {
             firstJob.cancelAndJoin()
@@ -67,11 +70,18 @@ class DataStoreProfileRepositoryTest {
         val filters = DataStoreCatalogFiltersRepository(preferences)
         val repository = DataStoreProfileRepository(preferences)
         val appliedFilters = CatalogFilters("pika", "electric")
+        val reminders = DataStoreReminderRepository(preferences)
+        val reminder = ClassReminder(32_700_000L, "Name at scheduling")
+        reminders.save(reminder)
         filters.save(appliedFilters)
-        repository.save(UserProfile("Alex", "file:///avatar.jpg", "https://example.com/resume.pdf"))
+        repository.save(UserProfile("Alex", "file:///avatar.jpg", "https://example.com/resume.pdf", "23:59"))
         repository.save(UserProfile(" ", " ", " "))
 
         assertEquals(UserProfile(), repository.profile.first())
+        assertEquals(appliedFilters, filters.filters.first())
+        assertEquals(reminder, reminders.reminder.first())
+        reminders.clear()
+        assertEquals(null, reminders.reminder.first())
         assertEquals(appliedFilters, filters.filters.first())
     }
 
@@ -82,7 +92,7 @@ class DataStoreProfileRepositoryTest {
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             repository.profile.collect { received += it }
         }
-        val profile = UserProfile("Alex", "file:///avatar.jpg", "https://example.com/resume.pdf")
+        val profile = UserProfile("Alex", "file:///avatar.jpg", "https://example.com/resume.pdf", "00:00")
         repository.save(profile)
         repository.save(profile)
 

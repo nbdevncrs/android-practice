@@ -6,7 +6,12 @@ import com.example.android_practice.profile.domain.model.UserProfile
 internal class EditProfileSavedState(private val handle: SavedStateHandle) {
     val draft: UserProfile?
         get() = if (handle.get<Boolean>(DRAFT_INITIALIZED) == true) {
-            UserProfile(handle[FULL_NAME] ?: "", handle[AVATAR_URI], handle[RESUME_URL] ?: "")
+            UserProfile(
+                fullName = handle[FULL_NAME] ?: "",
+                avatarUri = handle[AVATAR_URI],
+                resumeUrl = handle[RESUME_URL] ?: "",
+                favoriteClassTime = handle[FAVORITE_CLASS_TIME] ?: "",
+            )
         } else null
 
     val pendingCameraUri: String? get() = handle[CAMERA_URI]
@@ -18,6 +23,7 @@ internal class EditProfileSavedState(private val handle: SavedStateHandle) {
         handle[FULL_NAME] = profile.fullName
         handle[AVATAR_URI] = profile.avatarUri
         handle[RESUME_URL] = profile.resumeUrl
+        handle[FAVORITE_CLASS_TIME] = profile.favoriteClassTime
     }
 
     fun prepareCamera(uri: String) {
@@ -39,6 +45,7 @@ internal class EditProfileSavedState(private val handle: SavedStateHandle) {
         const val FULL_NAME = "profile.edit.full_name"
         const val AVATAR_URI = "profile.edit.avatar_uri"
         const val RESUME_URL = "profile.edit.resume_url"
+        const val FAVORITE_CLASS_TIME = "profile.edit.favorite_class_time"
         const val CAMERA_URI = "profile.edit.camera_uri"
         const val CAMERA_LAUNCHED = "profile.edit.camera_launched"
     }

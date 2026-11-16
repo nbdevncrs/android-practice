@@ -16,6 +16,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
+import com.example.android_practice.profile.presentation.platform.rememberReminderAccessRequest
 
 @Composable
 fun EditProfileRoute(entry: NavBackStackEntry, factory: ViewModelProvider.Factory, onBack: () -> Unit) {
@@ -25,6 +26,7 @@ fun EditProfileRoute(entry: NavBackStackEntry, factory: ViewModelProvider.Factor
         vm.selectPhoto(uri?.toString())
     }
     val camera = rememberLauncherForActivityResult(TakeProfilePicture()) { success -> vm.cameraResult(success) }
+    val reminderAccess = rememberReminderAccessRequest(onGranted = vm::save, onDenied = vm::reminderAccessDenied)
 
     LaunchedEffect(state.isSaved) {
         if (state.isSaved) onBack()
@@ -42,11 +44,13 @@ fun EditProfileRoute(entry: NavBackStackEntry, factory: ViewModelProvider.Factor
     }
 
     EditProfileScreen(
-        state = state,
+        state = state.copy(isRequestingReminderAccess = reminderAccess.isPending),
         onBack = onBack,
         onFullNameChange = vm::setFullName,
         onResumeUrlChange = vm::setResumeUrl,
-        onDone = vm::save,
+        onFavoriteClassTimeChange = vm::setFavoriteClassTime,
+        onDone = { if (vm.validateForSave()) reminderAccess.request() },
+        onReminderSettings = reminderAccess.openSettings,
         onRetryLoading = vm::retryLoading,
         onGallery = {
             try {
