@@ -4,6 +4,7 @@ data class UserProfile(
     val fullName: String = "",
     val avatarUri: String? = null,
     val resumeUrl: String = "",
+    val favoriteClassTime: String = "",
 ) {
     fun normalized(): UserProfile = copy(
         fullName = fullName.trim(),

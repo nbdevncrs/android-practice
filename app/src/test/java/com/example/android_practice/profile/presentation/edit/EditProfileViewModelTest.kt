@@ -7,6 +7,11 @@ import com.example.android_practice.profile.domain.model.UserProfile
 import com.example.android_practice.profile.domain.repository.ProfileRepository
 import com.example.android_practice.profile.domain.repository.AvatarRepository
 import com.example.android_practice.profile.domain.usecase.DiscardUnusedAvatar
+import com.example.android_practice.profile.domain.usecase.SaveProfileAndScheduleReminder
+import com.example.android_practice.profile.domain.model.ClassTime
+import com.example.android_practice.reminders.domain.model.ClassReminder
+import com.example.android_practice.reminders.domain.repository.ReminderClock
+import com.example.android_practice.reminders.domain.repository.ReminderScheduler
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -45,11 +50,12 @@ class EditProfileViewModelTest {
         runCurrent()
         vm.setFullName(" Alex Morgan ")
         vm.setResumeUrl(" https://example.com/NewResume.pdf ")
+        vm.setFavoriteClassTime("09:05")
         assertEquals(original, repository.current)
 
         vm.save()
         runCurrent()
-        assertEquals(UserProfile("Alex Morgan", original.avatarUri, "https://example.com/NewResume.pdf"), repository.current)
+        assertEquals(UserProfile("Alex Morgan", original.avatarUri, "https://example.com/NewResume.pdf", "09:05"), repository.current)
         assertTrue(vm.uiState.value.isSaved)
     }
 
@@ -61,6 +67,7 @@ class EditProfileViewModelTest {
         runCurrent()
         vm.setFullName(" ")
         vm.setResumeUrl("not a URL")
+        vm.setFavoriteClassTime("09:05")
         vm.save()
         runCurrent()
         assertTrue(vm.uiState.value.validation.fullNameRequired)
@@ -102,6 +109,7 @@ class EditProfileViewModelTest {
         vm.retryLoading()
         runCurrent()
         vm.setFullName("Updated")
+        vm.setFavoriteClassTime("09:05")
         repository.writeError = IOException("Write failed")
         vm.save()
         runCurrent()
@@ -124,6 +132,7 @@ class EditProfileViewModelTest {
         val vm = createViewModel(repository)
         runCurrent()
         vm.setFullName("Updated")
+        vm.setFavoriteClassTime("09:05")
         vm.save()
         vm.save()
         vm.setFullName("Ignored")
@@ -142,7 +151,20 @@ class EditProfileViewModelTest {
         repository: ProfileRepository,
         handle: SavedStateHandle = SavedStateHandle(),
         avatars: AvatarRepository = TestAvatarRepository(),
-    ) = EditProfileViewModel(repository, handle, avatars, cleanupScope, DiscardUnusedAvatar(repository, avatars)).also { store.put("editProfile", it) }
+    ) = EditProfileViewModel(repository, handle, avatars, cleanupScope, DiscardUnusedAvatar(repository, avatars),
+        saveProfileUseCase(repository)).also { store.put("editProfile", it) }
+
+    private fun saveProfileUseCase(repository: ProfileRepository) = SaveProfileAndScheduleReminder(
+        repository,
+        object : ReminderScheduler {
+            override suspend fun schedule(reminder: ClassReminder) = Unit
+            override suspend fun cancel() = Unit
+        },
+        object : ReminderClock {
+            override fun nowMillis(): Long = 0L
+            override fun todayAt(time: ClassTime): Long = 60_000L
+        },
+    )
 
     @Test
     fun discardedPhotoDraftDoesNotDeleteSavedAvatar() = runTest {
@@ -175,6 +197,7 @@ class EditProfileViewModelTest {
         vm.selectPhoto("content://gallery/second")
         runCurrent()
         assertTrue(avatars.discarded.contains(first))
+        vm.setFavoriteClassTime("09:05")
         vm.save()
         runCurrent()
         val savedUri = repository.current.avatarUri
@@ -218,7 +241,8 @@ class EditProfileViewModelTest {
         runCurrent()
         vm.cameraLaunched()
         val restoredHandle = SavedStateHandle(handle.keys().associateWith { handle.get<Any?>(it) })
-        val restored = EditProfileViewModel(repository, restoredHandle, avatars, cleanupScope, DiscardUnusedAvatar(repository, avatars))
+        val restored = EditProfileViewModel(repository, restoredHandle, avatars, cleanupScope, DiscardUnusedAvatar(repository, avatars),
+            saveProfileUseCase(repository))
             .also { store.put("restored", it) }
         restored.cameraResult(true)
         runCurrent()

@@ -39,6 +39,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.android_practice.R
 import com.example.android_practice.profile.presentation.components.ProfileAvatar
+import com.example.android_practice.profile.presentation.components.ClassTimePickerDialog
+import com.example.android_practice.profile.domain.model.ClassTimeValidation
 
 @Composable
 fun EditProfileScreen(
@@ -46,13 +48,26 @@ fun EditProfileScreen(
     onBack: () -> Unit,
     onFullNameChange: (String) -> Unit,
     onResumeUrlChange: (String) -> Unit,
+    onFavoriteClassTimeChange: (String) -> Unit,
     onDone: () -> Unit,
+    onReminderSettings: () -> Unit,
     onRetryLoading: () -> Unit,
     onGallery: () -> Unit,
     onCamera: () -> Unit,
 ) {
     var showPhotoSource by rememberSaveable { mutableStateOf(false) }
-    BackHandler(enabled = state.isSaving || state.isImportingAvatar) { }
+    var showTimePicker by rememberSaveable { mutableStateOf(false) }
+    if (showTimePicker && state.canEdit) {
+        ClassTimePickerDialog(
+            value = state.draft.favoriteClassTime,
+            onConfirm = { value ->
+                onFavoriteClassTimeChange(value)
+                showTimePicker = false
+            },
+            onDismiss = { showTimePicker = false },
+        )
+    }
+    BackHandler(enabled = state.isBusy) { }
     if (showPhotoSource) {
         AlertDialog(
             onDismissRequest = { showPhotoSource = false },
@@ -68,12 +83,12 @@ fun EditProfileScreen(
     }
     Column(Modifier.fillMaxSize().imePadding()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-            IconButton(onClick = onBack, enabled = !state.isSaving && !state.isImportingAvatar) {
+            IconButton(onClick = onBack, enabled = !state.isBusy) {
                 Icon(painterResource(R.drawable.ic_back), contentDescription = stringResource(R.string.back))
             }
             Text(stringResource(R.string.edit_profile), style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.weight(1f))
-            TextButton(onClick = onDone, enabled = state.canEdit) {
+            TextButton(onClick = onDone, enabled = state.canSave) {
                 Text(stringResource(if (state.isSaving) R.string.profile_saving else R.string.done))
             }
         }
@@ -133,15 +148,60 @@ fun EditProfileScreen(
                         Text(stringResource(if (state.validation.invalidResumeUrl)
                             R.string.profile_invalid_resume_url else R.string.profile_resume_optional))
                     },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { if (state.canEdit) onDone() }),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = state.draft.favoriteClassTime,
+                    onValueChange = onFavoriteClassTimeChange,
+                    label = { Text(stringResource(R.string.profile_class_time)) },
+                    placeholder = { Text(stringResource(R.string.profile_class_time_format)) },
+                    enabled = state.canEdit,
+                    singleLine = true,
+                    isError = state.timeValidation != ClassTimeValidation.VALID,
+                    supportingText = {
+                        Text(stringResource(when (state.timeValidation) {
+                            ClassTimeValidation.REQUIRED -> R.string.profile_class_time_required
+                            ClassTimeValidation.INVALID_FORMAT -> R.string.profile_class_time_invalid
+                            ClassTimeValidation.VALID -> R.string.profile_class_time_hint
+                        }))
+                    },
+                    trailingIcon = {
+                        IconButton(onClick = { showTimePicker = true }, enabled = state.canEdit) {
+                            Icon(painterResource(R.drawable.ic_clock),
+                                contentDescription = stringResource(R.string.profile_choose_class_time))
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (state.canSave) onDone() }),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(stringResource(R.string.profile_edit_hint), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (state.error == EditProfileError.SAVE) {
                     Text(stringResource(R.string.profile_save_error), color = MaterialTheme.colorScheme.error)
-                    Button(onClick = onDone, enabled = state.canEdit) { Text(stringResource(R.string.retry)) }
+                    Button(onClick = onDone, enabled = state.canSave) { Text(stringResource(R.string.retry)) }
+                }
+                if (state.isProfileSavedWithoutReminder) {
+                    Text(stringResource(R.string.reminder_profile_saved), color = MaterialTheme.colorScheme.error)
+                }
+                if (state.error == EditProfileError.TIME_PASSED) {
+                    Text(stringResource(R.string.reminder_time_passed), color = MaterialTheme.colorScheme.error)
+                }
+                if (state.error == EditProfileError.REMINDER) {
+                    Text(stringResource(R.string.reminder_schedule_error), color = MaterialTheme.colorScheme.error)
+                    Button(onClick = onDone, enabled = state.canSave) { Text(stringResource(R.string.retry)) }
+                }
+                if (state.error == EditProfileError.NOTIFICATIONS || state.error == EditProfileError.EXACT_ALARM ||
+                    state.error == EditProfileError.SETTINGS) {
+                    Text(stringResource(when (state.error) {
+                        EditProfileError.NOTIFICATIONS -> R.string.reminder_notifications_required
+                        EditProfileError.EXACT_ALARM -> R.string.reminder_exact_alarm_required
+                        else -> R.string.reminder_settings_unavailable
+                    }), color = MaterialTheme.colorScheme.error)
+                    Button(onClick = onReminderSettings, enabled = state.canEdit) {
+                        Text(stringResource(R.string.reminder_open_settings))
+                    }
                 }
             }
         }

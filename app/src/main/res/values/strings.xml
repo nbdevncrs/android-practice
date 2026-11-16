@@ -1,4 +1,20 @@
 <resources>
+    <string name="reminder_channel_name">Class reminders</string>
+    <string name="reminder_notification_title">Your class is starting</string>
+    <string name="reminder_notification_text">%1$s, it is time for your favorite class!</string>
+    <string name="reminder_time_passed">Choose a time later today.</string>
+    <string name="reminder_schedule_error">Unable to set the reminder. Please try again.</string>
+    <string name="reminder_profile_saved">Your profile was saved, but the new reminder was not set.</string>
+    <string name="reminder_notifications_required">Allow notifications to set your class reminder.</string>
+    <string name="reminder_exact_alarm_required">Allow alarms and reminders to notify you at the selected time.</string>
+    <string name="reminder_settings_unavailable">Unable to open settings. Check notification and alarm permissions in your device settings.</string>
+    <string name="reminder_open_settings">Open settings</string>
+    <string name="profile_class_time">Favorite class time</string>
+    <string name="profile_class_time_format">HH:mm</string>
+    <string name="profile_class_time_required">Enter your favorite class time.</string>
+    <string name="profile_class_time_invalid">Use HH:mm, from 00:00 to 23:59.</string>
+    <string name="profile_class_time_hint">24-hour format. Reminder time for today.</string>
+    <string name="profile_choose_class_time">Choose class time</string>
     <string name="resume_downloading">Downloading…</string>
     <string name="resume_network_error">Unable to download the resume. Check your connection and try again.</string>
     <string name="resume_server_error">The server could not provide the resume. Check the link and try again.</string>

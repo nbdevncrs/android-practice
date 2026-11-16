@@ -21,6 +21,13 @@ import com.example.android_practice.profile.data.repository.FileAvatarRepository
 import com.example.android_practice.profile.data.repository.HttpResumeRepository
 import com.example.android_practice.profile.domain.repository.ResumeRepository
 import com.example.android_practice.profile.domain.usecase.DiscardUnusedAvatar
+import com.example.android_practice.reminders.data.SystemReminderClock
+import com.example.android_practice.reminders.data.repository.DataStoreReminderRepository
+import com.example.android_practice.reminders.domain.repository.ReminderClock
+import com.example.android_practice.reminders.domain.repository.ReminderRepository
+import com.example.android_practice.reminders.data.AndroidReminderScheduler
+import com.example.android_practice.reminders.platform.ClassReminderNotifications
+import com.example.android_practice.profile.domain.usecase.SaveProfileAndScheduleReminder
 import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
@@ -38,6 +45,15 @@ class AppContainer(context: Context) {
     val filterBadgeCache by lazy { FilterBadgeCache(catalogFiltersRepository, applicationScope) }
 
     val profileRepository: ProfileRepository by lazy { DataStoreProfileRepository(preferences) }
+    val reminderRepository: ReminderRepository by lazy { DataStoreReminderRepository(preferences) }
+    val reminderClock: ReminderClock by lazy { SystemReminderClock() }
+    val reminderScheduler by lazy {
+        AndroidReminderScheduler(applicationContext, reminderRepository, reminderClock,
+            ClassReminderNotifications(applicationContext))
+    }
+    val saveProfileAndScheduleReminder by lazy {
+        SaveProfileAndScheduleReminder(profileRepository, reminderScheduler, reminderClock)
+    }
     val avatarRepository: AvatarRepository by lazy { FileAvatarRepository(applicationContext) }
     val discardUnusedAvatar by lazy { DiscardUnusedAvatar(profileRepository, avatarRepository) }
     val resumeRepository: ResumeRepository by lazy {
