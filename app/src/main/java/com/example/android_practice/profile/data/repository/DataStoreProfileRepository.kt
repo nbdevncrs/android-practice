@@ -19,6 +19,7 @@ class DataStoreProfileRepository(
                 fullName = values[FULL_NAME].orEmpty(),
                 avatarUri = values[AVATAR_URI],
                 resumeUrl = values[RESUME_URL].orEmpty(),
+                favoriteClassTime = values[FAVORITE_CLASS_TIME].orEmpty(),
             ).normalized()
         }
         .distinctUntilChanged()
@@ -29,6 +30,7 @@ class DataStoreProfileRepository(
             values.setOrRemove(FULL_NAME, normalized.fullName)
             values.setOrRemove(AVATAR_URI, normalized.avatarUri)
             values.setOrRemove(RESUME_URL, normalized.resumeUrl)
+            values.setOrRemove(FAVORITE_CLASS_TIME, normalized.favoriteClassTime)
         }
     }
 
@@ -40,5 +42,6 @@ class DataStoreProfileRepository(
         val FULL_NAME = stringPreferencesKey("profile.full_name")
         val AVATAR_URI = stringPreferencesKey("profile.avatar_uri")
         val RESUME_URL = stringPreferencesKey("profile.resume_url")
+        val FAVORITE_CLASS_TIME = stringPreferencesKey("profile.favorite_class_time")
     }
 }

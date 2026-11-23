@@ -7,10 +7,11 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.android_practice.profile.domain.model.UserProfile
-import com.example.android_practice.profile.domain.model.validate
 import com.example.android_practice.profile.domain.repository.ProfileRepository
 import com.example.android_practice.profile.domain.repository.AvatarRepository
 import com.example.android_practice.profile.domain.usecase.DiscardUnusedAvatar
+import com.example.android_practice.profile.domain.usecase.SaveProfileAndScheduleReminder
+import com.example.android_practice.profile.domain.usecase.SaveProfileResult
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -29,6 +30,7 @@ class EditProfileViewModel(
     private val avatars: AvatarRepository,
     private val cleanupScope: CoroutineScope,
     private val discardUnusedAvatar: DiscardUnusedAvatar,
+    private val saveProfileAndScheduleReminder: SaveProfileAndScheduleReminder,
 ) : ViewModel() {
     private val editorState = EditProfileSavedState(savedStateHandle)
     private val _uiState = MutableStateFlow(EditProfileUiState())
@@ -69,20 +71,40 @@ class EditProfileViewModel(
         _uiState.update { it.copy(validation = it.validation.copy(invalidResumeUrl = false)) }
     }
 
-    fun save() {
+    fun setFavoriteClassTime(value: String) {
+        if (!_uiState.value.canEdit) return
+        updateDraft(_uiState.value.draft.copy(favoriteClassTime = value))
+    }
+
+    fun validateForSave(): Boolean {
         val state = _uiState.value
-        if (!state.canEdit) return
-        val profile = state.draft.normalized()
-        val validation = profile.validate()
-        _uiState.update { it.copy(validation = validation, error = null) }
-        if (!validation.isValid) return
+        if (!state.canSave) return false
+        val result = saveProfileAndScheduleReminder.validate(state.draft)
+        _uiState.update { current ->
+            when (result) {
+                is SaveProfileResult.InvalidProfile -> current.copy(validation = result.validation, error = null)
+                SaveProfileResult.TimePassed -> current.copy(error = EditProfileError.TIME_PASSED)
+                else -> current.copy(error = null)
+            }
+        }
+        return result == null
+    }
+
+    fun reminderAccessDenied(error: EditProfileError) {
+        _uiState.update { it.copy(error = error) }
+    }
+
+    fun save() {
+        if (!validateForSave()) return
+        val profile = _uiState.value.draft.normalized()
         _uiState.update { it.copy(isSaving = true) }
         viewModelScope.launch {
             try {
                 val previousAvatar = repository.profile.first().avatarUri
-                repository.save(profile)
-                _uiState.update { it.copy(isSaving = false, isSaved = true) }
-                if (previousAvatar != profile.avatarUri) discardLater(previousAvatar)
+                val result = saveProfileAndScheduleReminder(profile)
+                val profileSaved = result == SaveProfileResult.Saved || result is SaveProfileResult.ReminderFailure
+                if (profileSaved && previousAvatar != profile.avatarUri) discardLater(previousAvatar)
+                _uiState.update { it.withSaveResult(result) }
             } catch (error: CancellationException) {
                 throw error
             } catch (_: IOException) {
@@ -180,7 +202,6 @@ class EditProfileViewModel(
     override fun onCleared() {
         discardLater(_uiState.value.draft.avatarUri)
         discardLater(editorState.pendingCameraUri)
-        super.onCleared()
     }
 
     private fun updateDraft(profile: UserProfile) {
@@ -194,8 +215,18 @@ class EditProfileViewModel(
             avatars: AvatarRepository,
             cleanupScope: CoroutineScope,
             discardUnusedAvatar: DiscardUnusedAvatar,
+            saveProfileAndScheduleReminder: SaveProfileAndScheduleReminder,
         ) = viewModelFactory {
-            initializer { EditProfileViewModel(repository, createSavedStateHandle(), avatars, cleanupScope, discardUnusedAvatar) }
+            initializer {
+                EditProfileViewModel(
+                    repository = repository,
+                    savedStateHandle = createSavedStateHandle(),
+                    avatars = avatars,
+                    cleanupScope = cleanupScope,
+                    discardUnusedAvatar = discardUnusedAvatar,
+                    saveProfileAndScheduleReminder = saveProfileAndScheduleReminder,
+                )
+            }
         }
     }
 }
