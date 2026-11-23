@@ -1,6 +1,8 @@
 package com.example.android_practice
 
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import com.example.android_practice.catalog.data.remote.PokemonApiFactory
 import com.example.android_practice.catalog.data.repository.DataStoreCatalogFiltersRepository
 import com.example.android_practice.catalog.data.repository.PokemonRepositoryImpl
@@ -14,19 +16,8 @@ import com.example.android_practice.core.storage.applicationPreferences
 import com.example.android_practice.favorites.data.local.FileFavoriteArtworkStore
 import com.example.android_practice.favorites.data.repository.RoomFavoritesRepository
 import com.example.android_practice.favorites.domain.repository.FavoritesRepository
-import com.example.android_practice.profile.data.repository.DataStoreProfileRepository
-import com.example.android_practice.profile.domain.repository.ProfileRepository
-import com.example.android_practice.profile.domain.repository.AvatarRepository
-import com.example.android_practice.profile.data.repository.FileAvatarRepository
-import com.example.android_practice.profile.data.repository.HttpResumeRepository
-import com.example.android_practice.profile.domain.repository.ResumeRepository
+import com.example.android_practice.profile.data.ProfileData
 import com.example.android_practice.profile.domain.usecase.DiscardUnusedAvatar
-import com.example.android_practice.reminders.data.SystemReminderClock
-import com.example.android_practice.reminders.data.repository.DataStoreReminderRepository
-import com.example.android_practice.reminders.domain.repository.ReminderClock
-import com.example.android_practice.reminders.domain.repository.ReminderRepository
-import com.example.android_practice.reminders.data.AndroidReminderScheduler
-import com.example.android_practice.reminders.platform.ClassReminderNotifications
 import com.example.android_practice.profile.domain.usecase.SaveProfileAndScheduleReminder
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -44,20 +35,22 @@ class AppContainer(context: Context) {
     }
     val filterBadgeCache by lazy { FilterBadgeCache(catalogFiltersRepository, applicationScope) }
 
-    val profileRepository: ProfileRepository by lazy { DataStoreProfileRepository(preferences) }
-    val reminderRepository: ReminderRepository by lazy { DataStoreReminderRepository(preferences) }
-    val reminderClock: ReminderClock by lazy { SystemReminderClock() }
-    val reminderScheduler by lazy {
-        AndroidReminderScheduler(applicationContext, reminderRepository, reminderClock,
-            ClassReminderNotifications(applicationContext))
+    val profileData by lazy {
+        ProfileData(applicationContext, preferences, client) {
+            val intent = Intent(applicationContext, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            PendingIntent.getActivity(
+                applicationContext,
+                OPEN_APP_REQUEST_CODE,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }
     }
+    val discardUnusedAvatar by lazy { DiscardUnusedAvatar(profileData.profiles, profileData.avatars) }
     val saveProfileAndScheduleReminder by lazy {
-        SaveProfileAndScheduleReminder(profileRepository, reminderScheduler, reminderClock)
-    }
-    val avatarRepository: AvatarRepository by lazy { FileAvatarRepository(applicationContext) }
-    val discardUnusedAvatar by lazy { DiscardUnusedAvatar(profileRepository, avatarRepository) }
-    val resumeRepository: ResumeRepository by lazy {
-        HttpResumeRepository(File(applicationContext.cacheDir, "profile/resumes"), client)
+        SaveProfileAndScheduleReminder(profileData.profiles, profileData.reminderScheduler, profileData.clock)
     }
 
     private val database by lazy { PracticeDatabase.create(applicationContext) }
@@ -78,4 +71,8 @@ class AppContainer(context: Context) {
 
     val getPokemonPage = GetPokemonPage(repository)
     val getPokemonDetails = GetPokemonDetails(repository)
+
+    private companion object {
+        const val OPEN_APP_REQUEST_CODE = 701
+    }
 }

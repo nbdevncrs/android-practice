@@ -37,10 +37,9 @@ import com.example.android_practice.catalog.presentation.filters.FiltersScreen
 import com.example.android_practice.catalog.presentation.filters.FiltersViewModel
 import com.example.android_practice.favorites.presentation.FavoritesScreen
 import com.example.android_practice.favorites.presentation.FavoritesViewModel
-import com.example.android_practice.profile.presentation.view.ProfileRoute
-import com.example.android_practice.profile.presentation.view.ProfileViewModel
-import com.example.android_practice.profile.presentation.edit.EditProfileRoute
-import com.example.android_practice.profile.presentation.edit.EditProfileViewModel
+import com.example.android_practice.profile.presentation.navigation.ProfileDependencies
+import com.example.android_practice.profile.presentation.navigation.ProfileNavigation
+import com.example.android_practice.profile.presentation.navigation.profileGraph
 
 private object Routes {
     const val CATALOG_GRAPH = "catalog_graph"
@@ -51,9 +50,6 @@ private object Routes {
     const val FAVORITES_GRAPH = "favorites_graph"
     const val FAVORITES = "favorites"
     const val FAVORITE_DETAILS = "favorite_details/{${DetailsViewModel.POKEMON_ID_KEY}}"
-    const val PROFILE_GRAPH = "profile_graph"
-    const val PROFILE = "profile"
-    const val EDIT_PROFILE = "edit_profile"
     fun details(id: Int) = "details/$id"
     fun favoriteDetails(id: Int) = "favorite_details/$id"
 }
@@ -61,7 +57,7 @@ private object Routes {
 private enum class BottomTab(val route: String, @param:StringRes val title: Int, @param:DrawableRes val icon: Int) {
     CATALOG(Routes.CATALOG_GRAPH, R.string.catalog_title, R.drawable.ic_catalog),
     FAVORITES(Routes.FAVORITES_GRAPH, R.string.favorites_title, R.drawable.ic_favorite),
-    PROFILE(Routes.PROFILE_GRAPH, R.string.profile_title, R.drawable.ic_profile),
+    PROFILE(ProfileNavigation.ROUTE, R.string.profile_title, R.drawable.ic_profile),
 }
 
 @Composable
@@ -79,17 +75,18 @@ fun AppNavigation(container: AppContainer) {
         DetailsViewModel.factory(container.getPokemonDetails, container.favoritesRepository)
     }
     val favoritesFactory = remember(container) { FavoritesViewModel.factory(container.favoritesRepository) }
-    val profileFactory = remember(container) { ProfileViewModel.factory(container.profileRepository, container.resumeRepository) }
-    val editProfileFactory = remember(container) {
-        EditProfileViewModel.factory(
-            repository = container.profileRepository,
-            avatars = container.avatarRepository,
+    val profileDependencies = remember(container) {
+        ProfileDependencies(
+            profiles = container.profileData.profiles,
+            avatars = container.profileData.avatars,
+            resumes = container.profileData.resumes,
+            reminderAccess = container.profileData.reminderAccess,
             cleanupScope = container.applicationScope,
             discardUnusedAvatar = container.discardUnusedAvatar,
             saveProfileAndScheduleReminder = container.saveProfileAndScheduleReminder,
         )
     }
-    val isEditingProfile = destination?.route == Routes.EDIT_PROFILE
+    val isEditingProfile = ProfileNavigation.isEditor(destination)
 
     Scaffold(floatingActionButton = { if (!isEditingProfile) NetworkDiagnosticsButton() }, bottomBar = {
         if (destination?.route != Routes.FILTERS && !isEditingProfile) {
@@ -186,17 +183,7 @@ fun AppNavigation(container: AppContainer) {
                     DetailsRoute(entry, detailsFactory, onBack = { navController.popBackStack() })
                 }
             }
-            navigation(startDestination = Routes.PROFILE, route = Routes.PROFILE_GRAPH) {
-                composable(Routes.PROFILE) { entry ->
-                    ProfileRoute(entry, profileFactory,
-                        onEdit = { navController.navigate(Routes.EDIT_PROFILE) { launchSingleTop = true } })
-                }
-                composable(Routes.EDIT_PROFILE) { entry ->
-                    EditProfileRoute(entry, editProfileFactory, onBack = {
-                        if (navController.currentBackStackEntry == entry) navController.popBackStack()
-                    })
-                }
-            }
+            profileGraph(navController, profileDependencies)
         }
     }
 }
