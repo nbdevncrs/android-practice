@@ -43,6 +43,9 @@ room {
 }
 
 dependencies {
+    implementation(project(":profile:domain"))
+    implementation(project(":profile:data"))
+    implementation(project(":profile:presentation"))
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.room.runtime)
     ksp(libs.androidx.room.compiler)
